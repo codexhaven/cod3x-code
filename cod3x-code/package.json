@@ -1,0 +1,15 @@
+{
+  "name": "cod3x-code",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "cod3x.js",
+  "bin": {
+    "cod3x": "./cod3x.js"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "diff": "^5.2.2",
+    "dotenv": "^17.4.2",
+    "glob": "^10.5.0"
+  }
+}
