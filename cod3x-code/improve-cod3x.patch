@@ -1,0 +1,34 @@
+--- cod3x.js.original	2025-01-01 00:00:00.000000000 +0000
++++ cod3x.js	2025-01-01 00:00:00.000000000 +0000
+@@ -245,6 +245,32 @@
+         { role: 'user', content: input }
+       ]);
+ 
++      // === SELF-IMPROVEMENT CRITIC LOOP ===
++      const criticPrompt = `You are a strict quality critic. Rate this response 0-100 on: completeness, accuracy, clarity, usefulness.
++Response: "${response.slice(0, 1500)}"
++Output: SCORE:[number]|FEEDBACK:[specific issues]`;
++      
++      const criticResponse = await llm.chat([
++        { role: 'system', content: criticPrompt }
++      ]);
++      
++      const scoreMatch = criticResponse.match(/SCORE:(\d+)/);
++      const score = scoreMatch ? parseInt(scoreMatch[1]) : 70;
++      
++      if (score < 80) {
++        const improvePrompt = `Improve this response. Fix: ${criticResponse}
++Original: ${response.slice(0, 1000)}
++Better version (thorough, complete, with examples):`;
++        
++        const improvedResponse = await llm.chat([
++          { role: 'system', content: improvePrompt }
++        ]);
++        
++        console.log(chalk.yellow(`\n  🔄 Self-improved (score: ${score} → better)\n`));
++        response = improvedResponse;
++      }
++      // === END SELF-IMPROVEMENT ===
++
+       clearInterval(spinner);
+       process.stdout.write('\r\x1b[K');
