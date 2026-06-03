@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Cod3x Code v4.0</title>
+<style>
+:root{--bg:#0a0a14;--panel:#12122a;--border:#2a2a4e;--accent:#7c5cff;--text:#e0e0e0;--green:#4cff4c}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
+.header{background:var(--panel);padding:12px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:1.2em;color:var(--accent)}.header span{font-size:.7em;color:var(--green)}
+.main{flex:1;display:flex;overflow:hidden}
+.sidebar{width:280px;background:var(--panel);border-right:1px solid var(--border);padding:15px;overflow-y:auto}
+.sidebar h3{color:var(--accent);font-size:.7em;text-transform:uppercase;margin:10px 0 4px 0}
+.chat{flex:1;display:flex;flex-direction:column}
+.messages{flex:1;overflow-y:auto;padding:15px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:85%;padding:10px 14px;border-radius:10px;animation:slideIn .3s}
+@keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{background:#2a1a4e;align-self:flex-end}
+.msg.agent{background:#1a1a3e;align-self:flex-start;border:1px solid #2a2a5e}
+.msg .who{font-size:.65em;color:var(--accent);margin-bottom:2px}
+.msg pre{background:#0a0a14;padding:8px;border-radius:4px;overflow-x:auto;font-size:.8em;margin:4px 0}
+.input-area{padding:10px 15px;background:var(--panel);border-top:1px solid var(--border);display:flex;gap:8px}
+.input-area input{flex:1;padding:10px 14px;background:#1a1a3e;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9em;outline:none}
+.input-area input:focus{border-color:var(--accent)}
+.input-area button{padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
+.status{background:#0e0e22;padding:6px 15px;font-size:.65em;color:#888;display:flex;justify-content:space-between;border-top:1px solid var(--border)}
+.loading{display:flex;gap:3px;padding:8px}.loading span{width:5px;height:5px;background:var(--accent);border-radius:50%;animation:bounce 1.4s infinite}
+.loading span:nth-child(2){animation-delay:.2s}.loading span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-6px)}}
+.switch{position:relative;display:inline-block;width:34px;height:18px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#333;border-radius:18px;transition:.3s}
+.slider:before{position:absolute;content:"";height:12px;width:12px;left:3px;bottom:3px;background:#7c5cff;border-radius:50%;transition:.3s}
+input:checked+.slider{background:#2a2a5e}
+input:checked+.slider:before{transform:translateX(16px)}
+.slider.small{width:28px;height:14px}
+.slider.small:before{height:10px;width:10px;left:2px;bottom:2px}
+input:checked+.slider.small:before{transform:translateX(14px)}
+</style>
+</head>
+<body>
+<div class="header"><h1>🚀 Cod3x Code v4.0</h1><span>🟢 70 Tools | 16 Agents | Swarm</span></div>
+<div class="main">
+<div class="sidebar">
+<h3>🤖 Agents (16)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Code Generator</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('code-generator',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Code Reviewer</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('code-reviewer',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Debugger</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('debugger',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Architect</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('architect',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Tester</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('tester',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Documenter</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('documenter',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Git Manager</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('git-manager',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Security Auditor</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('security-auditor',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Optimizer</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('optimizer',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Web Browser</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('browser',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Swarm Leader</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('swarm-leader',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Task Decomposer</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('task-decomposer',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Error Analyst</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('error-analyst',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 Trail Runner</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('trail-runner',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 system</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('system',this.checked)"><span class="slider"></span></label>
+        </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 0">
+            <span style="font-size:.7em;color:#ccc">🤖 user</span>
+            <label class="switch"><input type="checkbox" checked onchange="toggleAgent('user',this.checked)"><span class="slider"></span></label>
+        </div>
+<h3 style="margin-top:10px">🔧 Tools by Category</h3>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 ai (3)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 complex_prompt</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('complex_prompt',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 multi_step</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('multi_step',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 think</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('think',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 browser (5)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 browse_page</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('browse_page',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 click_element</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('click_element',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 fill_form</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('fill_form',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 scrape_content</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('scrape_content',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 screenshot_page</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('screenshot_page',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 code (8)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 analyze_code</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('analyze_code',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 count_tokens</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('count_tokens',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 extract_imports</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('extract_imports',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 find_dead_code</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('find_dead_code',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 format_code</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('format_code',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 generate_tests</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('generate_tests',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 lint_code</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('lint_code',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 refactor_code</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('refactor_code',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 database (2)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 db_migrate</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('db_migrate',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 db_query</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('db_query',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 debug (5)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 inspect_variable</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('inspect_variable',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 set_breakpoint</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('set_breakpoint',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 stack_trace</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('stack_trace',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 trail_start</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('trail_start',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 trail_stop</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('trail_stop',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 documentation (3)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 generate_docs</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('generate_docs',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 readme_generator</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('readme_generator',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 update_changelog</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('update_changelog',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 execution (3)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 bash</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('bash',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 eval_code</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('eval_code',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 spawn</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('spawn',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 filesystem (13)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 copy_file</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('copy_file',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 edit_file</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('edit_file',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 find_files</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('find_files',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 glob_search</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('glob_search',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 grep_search</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('grep_search',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 list_directory</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('list_directory',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 move_file</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('move_file',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 read_json</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('read_json',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 read_file</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('read_file',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 remove_file</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('remove_file',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 file_stat</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('file_stat',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 write_json</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('write_json',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 write_file</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('write_file',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 git (9)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 git_branch</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('git_branch',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 git_checkout</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('git_checkout',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 git_commit</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('git_commit',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 git_diff</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('git_diff',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 git_log</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('git_log',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 git_merge</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('git_merge',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 git_remote</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('git_remote',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 git_stash</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('git_stash',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 git_status</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('git_status',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 network (3)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 download_file</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('download_file',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 fetch_url</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('fetch_url',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 web_search</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('web_search',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 project (3)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 project_dependencies</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('project_dependencies',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 project_info</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('project_info',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 project_scripts</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('project_scripts',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 search (3)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 file_search</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('file_search',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 search_code</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('search_code',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 semantic_search</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('semantic_search',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 testing (3)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 coverage_report</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('coverage_report',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 run_tests</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('run_tests',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 snapshot_test</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('snapshot_test',this.checked)"><span class="slider small"></span></label>
+            </div>
+<h3 style="color:var(--accent);font-size:.7em;text-transform:uppercase;margin:8px 0 4px 0">📂 utility (7)</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 clipboard</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('clipboard',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 compress</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('compress',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 decompress</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('decompress',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 env_manager</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('env_manager',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 calculate_hash</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('calculate_hash',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 notebook</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('notebook',this.checked)"><span class="slider small"></span></label>
+            </div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:1px 0">
+                <span style="font-size:.65em;color:#888">🔹 parse_data</span>
+                <label class="switch"><input type="checkbox" onchange="toggleTool('parse_data',this.checked)"><span class="slider small"></span></label>
+            </div>
+
+</div>
+<div class="chat">
+<div class="messages" id="msgs">
+<div class="msg agent"><div class="who">Cod3x</div>👋 I'm Cod3x Code v4.0.<br>✅ 70 tools · 16 agents · Swarm<br>🖥️ Workspace ready<br><br>Toggle agents/tools ON/OFF in sidebar, then chat!</div>
+</div>
+<form class="input-area" onsubmit="sendForm(event)">
+<input id="inp" placeholder="Toggle agents ON, then ask anything..." autofocus>
+<button type="submit">Send</button>
+</form>
+</div></div>
+<div class="status"><span id="agent">💬 Chat</span><span id="count">0 messages</span></div>
+<script>
+let activeAgents=new Set(),activeTools=new Set(),count=0,history=[];
+function toggleAgent(n,on){on?activeAgents.add(n):activeAgents.delete(n);document.getElementById('inp').value=on?'!agent '+n+' ':'';document.getElementById('inp').focus()}
+function toggleTool(n,on){on?activeTools.add(n):activeTools.delete(n);document.getElementById('inp').value=on?'Use '+n+': ':'';document.getElementById('inp').focus()}
+function addMsg(t,w){const d=document.createElement('div');d.className='msg '+t;d.innerHTML='<div class="who">'+w+'</div>';return d}
+async function sendForm(e){e.preventDefault();const i=document.getElementById('inp');const t=i.value.trim();if(!t)return;send(t);i.value=''}
+async function send(text){
+const msgs=document.getElementById('msgs');
+const u=addMsg('user','You');u.appendChild(document.createTextNode(text));msgs.appendChild(u);
+const load=document.createElement('div');load.className='loading';load.id='load';load.innerHTML='<span></span><span></span><span></span>';msgs.appendChild(load);
+msgs.scrollTop=msgs.scrollHeight;
+try{
+const r=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history})});
+const d=await r.json();
+document.getElementById('load')?.remove();
+const a=addMsg('agent','Cod3x');a.innerHTML+=d.response.replace(/\n/g,'<br>');msgs.appendChild(a);
+history.push({role:'user',content:text});history.push({role:'assistant',content:d.response});
+if(history.length>20)history=history.slice(-20);
+count++;document.getElementById('count').textContent=count+' messages';
+}catch(err){
+document.getElementById('load')?.remove();
+const e=addMsg('agent','System');e.textContent='Error: '+err.message;msgs.appendChild(e);
+}
+msgs.scrollTop=msgs.scrollHeight;document.getElementById('inp').focus();
+}
+</script>
+</body>
+</html>
