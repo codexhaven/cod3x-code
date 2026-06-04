@@ -115,7 +115,114 @@ function executeTool(name, params) {
 // ============================================================
 // AGENT LOOP
 // ============================================================
+// ============================================================
+// ORCHESTRATOR - Plan -> Execute -> Observe -> Continue
+// Forces the AI to execute tools, not just describe them
+// ============================================================
 async function processMessage(msg, history=[]) {
+    // Only orchestrate complex tasks, not simple chat
+    const complexKeywords = ['review', 'analyze', 'build', 'create', 'generate', 'test all', 'every file', 'report', 'scan', 'audit', 'deploy', 'refactor', 'swarm', 'complex'];
+    const isComplex = complexKeywords.some(kw => msg.toLowerCase().includes(kw));
+    
+    if (!isComplex) {
+        // Simple chat - just use AI directly
+        const messages = [{role:'system',content:SYSTEM}, ...history.slice(-10), {role:'user',content:msg}];
+        return await callAI(messages);
+    }
+    
+    const MAX_STEPS = 10;
+    let context = msg;
+    let allResults = [];
+    
+    // STEP 1: Force the AI to make a plan
+    const planPrompt = `TASK: ${msg}\n\nCreate a numbered step-by-step plan to accomplish this task. Each step must use a specific tool from this list: read_file, write_file, list_directory, bash, grep_search, fetch_url, web_search, download_file.\n\nFormat your plan as:\n1. tool_name: what to do\n2. tool_name: what to do\n...\n\nBe specific. Include file paths and URLs.`;
+    
+    const plan = await callAI([{role:'system',content:SYSTEM},{role:'user',content:planPrompt}]);
+    console.log('\\n📋 PLAN:');
+    console.log(plan.substring(0, 500));
+    
+    // STEP 2: Extract steps from the plan
+    const steps = [];
+    const stepLines = plan.match(/\d+\.\s*(\w+):\s*(.+)/g);
+    if (stepLines) {
+        for (const line of stepLines) {
+            const m = line.match(/\d+\.\s*(\w+):\s*(.+)/);
+            if (m) steps.push({ tool: m[1].trim(), description: m[2].trim() });
+        }
+    }
+    
+    if (steps.length === 0) {
+        // No plan extracted, fall back to direct AI response
+        return await callAI([{role:'system',content:SYSTEM}, ...history.slice(-10), {role:'user',content:msg}]);
+    }
+    
+    console.log(`\\n🔧 Executing ${steps.length} steps...`);
+    
+    // STEP 3: Execute each step, feeding results forward
+    for (let i = 0; i < steps.length && i < MAX_STEPS; i++) {
+        const step = steps[i];
+        console.log(`\\n  [${i+1}/${steps.length}] ${step.tool}: ${step.description}`);
+        
+        // Build parameters from the description
+        const params = extractParams(step.tool, step.description);
+        
+        if (!params) {
+            allResults.push(`Step ${i+1}: Could not parse parameters for ${step.tool}`);
+            continue;
+        }
+        
+        // Execute the tool
+        const result = executeTool(step.tool, params);
+        const preview = (result || '').substring(0, 200).replace(/\n/g, ' ');
+        console.log(`  ✅ ${preview}...`);
+        
+        allResults.push({ step: i+1, tool: step.tool, description: step.description, result: result?.substring(0, 1000) });
+        
+        // Feed result into context for next step
+        context += `\\n\\nStep ${i+1} result (${step.tool}): ${result?.substring(0, 500)}`;
+    }
+    
+    // STEP 4: Ask AI to synthesize final report from all results
+    const summaryPrompt = `TASK: ${msg}\\n\\nRESULTS:\\n${JSON.stringify(allResults, null, 2)}\\n\\nSynthesize a comprehensive final report based on these results. Be specific and detailed.`;
+    
+    const finalResponse = await callAI([{role:'system',content:SYSTEM},{role:'user',content:summaryPrompt}]);
+    
+    return finalResponse;
+}
+
+// Extract parameters from natural language description
+function extractParams(tool, description) {
+    // Extract file paths
+    const pathMatch = description.match(/['"]?([\w./-]+\.[\w]+)['"]?/);
+    const urlMatch = description.match(/(https?:\/\/[^\s]+)/);
+    const dirMatch = description.match(/([\w./-]+)\s*directory/);
+    
+    switch(tool) {
+        case 'read_file':
+        case 'write_file':
+            if (pathMatch) return { file: pathMatch[1] };
+            return null;
+        case 'list_directory':
+            if (dirMatch) return { path: dirMatch[1] };
+            return { path: '.' };
+        case 'bash':
+            return { command: description };
+        case 'grep_search':
+            const pattern = description.match(/['"]([^'"]+)['"]/);
+            return { pattern: pattern ? pattern[1] : description, path: pathMatch ? pathMatch[1] : '.' };
+        case 'fetch_url':
+        case 'download_file':
+            if (urlMatch) return { url: urlMatch[1] };
+            return null;
+        case 'web_search':
+            return { query: description };
+        default:
+            return null;
+    }
+}
+
+// Old processMessage kept as fallback
+async function _processMessageOriginal(msg, history=[]) {
     const messages = [{role:'system',content:SYSTEM}, ...history.slice(-10), {role:'user',content:msg}];
     let response = await callAI(messages);
     
@@ -141,49 +248,6 @@ async function processMessage(msg, history=[]) {
 // ============================================================
 // HTTP SERVER
 // ============================================================
-
-// ============================================================
-// ORCHESTRATOR - Memory & State (from codex-developer patterns)
-// ============================================================
-const CODEX_DIR = path.join(__dirname, '.codex');
-if (!fs.existsSync(CODEX_DIR)) fs.mkdirSync(CODEX_DIR, { recursive: true });
-
-const STATE_FILE = path.join(CODEX_DIR, 'state.json');
-const BRAIN_FILE = path.join(CODEX_DIR, 'project_brain.md');
-const QUEUE_FILE = path.join(CODEX_DIR, 'build-queue.txt');
-const DONE_FILE = path.join(CODEX_DIR, 'build-done.txt');
-
-if (!fs.existsSync(STATE_FILE)) fs.writeFileSync(STATE_FILE, JSON.stringify({ cycle: 0, successful: 0, failures: 0, files_built: [] }));
-if (!fs.existsSync(BRAIN_FILE)) fs.writeFileSync(BRAIN_FILE, '# Cod3x Project Brain\\n');
-if (!fs.existsSync(QUEUE_FILE)) fs.writeFileSync(QUEUE_FILE, '');
-if (!fs.existsSync(DONE_FILE)) fs.writeFileSync(DONE_FILE, '');
-
-function getMemory() {
-    try {
-        const brain = fs.readFileSync(BRAIN_FILE, 'utf8').substring(0, 500);
-        const done = fs.readFileSync(DONE_FILE, 'utf8').split('\\n').filter(Boolean);
-        const queue = fs.readFileSync(QUEUE_FILE, 'utf8').split('\\n').filter(Boolean);
-        const remaining = queue.filter(q => !done.includes(q));
-        return { brain, doneCount: done.length, remainingCount: remaining.length, remainingFiles: remaining.slice(0, 5) };
-    } catch(e) { return { brain: '', doneCount: 0, remainingCount: 0, remainingFiles: [] }; }
-}
-
-function updateMemory(file, mode, success) {
-    try {
-        const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-        state.cycle++;
-        if (success) {
-            state.successful++;
-            state.files_built.push({ file, mode, time: new Date().toISOString() });
-            fs.appendFileSync(DONE_FILE, mode + ':' + file + '\\n');
-        } else {
-            state.failures++;
-        }
-        fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
-        fs.appendFileSync(BRAIN_FILE, '\\n- [' + (success ? 'OK' : 'FAIL') + '] ' + mode + ': ' + file);
-    } catch(e) {}
-}
-
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
