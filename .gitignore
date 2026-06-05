@@ -1,0 +1,29 @@
+# Cod3x by CodexHaven
+.cod3x/
+logs/
+*.cod3x.log
+.cod3x-memory.json
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
+build/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+.codex/
+logs/
+*.cod3x.log
+.cod3x-memory.json
