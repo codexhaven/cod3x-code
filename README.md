@@ -1,6 +1,6 @@
 # Cod3x Code v4.0
 
-> **The Ultimate Open-Source Claude Code Alternative** — Developed by [CodexHaven](https://github.com/codexhaven)
+> **The Ultimate FREE Open-Source** — Developed by [CodexHaven](https://github.com/codexhaven)
 
 [![Version](https://img.shields.io/badge/version-4.0.0-00D4AA.svg)](https://github.com/codexhaven/cod3x-code)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
