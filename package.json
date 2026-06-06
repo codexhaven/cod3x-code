@@ -27,7 +27,7 @@
     "#swarm/*": "./dist/swarm/*"
   },
   "scripts": {
-    "build": "tsc "build": "tsc && node scripts/fix-dist-paths.js && chmod +x dist/main.js""build": "tsc && node scripts/fix-dist-paths.js && chmod +x dist/main.js" node scripts/fix-dist-paths.js "build": "tsc && node scripts/fix-dist-paths.js && chmod +x dist/main.js""build": "tsc && node scripts/fix-dist-paths.js && chmod +x dist/main.js" node scripts/fix-all-imports.cjs "build": "tsc && node scripts/fix-dist-paths.js && chmod +x dist/main.js""build": "tsc && node scripts/fix-dist-paths.js && chmod +x dist/main.js" chmod +x dist/main.js",
+    "build": "tsc && node scripts/fix-dist-paths.js && node scripts/fix-all-imports.cjs && chmod +x dist/main.js",
     "dev": "tsx src/main.tsx",
     "start": "bash start.sh",
     "test": "vitest run",
