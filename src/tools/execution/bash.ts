@@ -115,7 +115,7 @@ export const definition: ToolDefinition = {
 
       const { stdout, stderr } = await execAsync(command, execOptions);
 
-      const output = stdout || stderr || '(no output)';
+      const output = (stdout || stderr || "(no output)").toString();
       return {
         success: true,
         output: output.slice(0, context.config.limits.maxOutputSize),
