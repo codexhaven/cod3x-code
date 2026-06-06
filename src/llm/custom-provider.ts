@@ -87,7 +87,7 @@ export class CustomProvider implements LLMProvider {
       const client = url.protocol === 'https:' ? https : http;
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data),
+        'Content-Length': String(Buffer.byteLength(data)),
       };
       if (this.apiKey) headers['Authorization'] = `Bearer ${this.apiKey}`;
 
@@ -129,7 +129,7 @@ export class CustomProvider implements LLMProvider {
       const client = url.protocol === 'https:' ? https : http;
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data),
+        'Content-Length': String(Buffer.byteLength(data)),
         'Accept': 'text/event-stream',
       };
       if (this.apiKey) headers['Authorization'] = `Bearer ${this.apiKey}`;
