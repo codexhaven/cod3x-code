@@ -29,7 +29,7 @@
   "scripts": {
     "build": "tsc && node scripts/fix-dist-paths.js && chmod +x dist/main.js",
     "dev": "tsx src/main.tsx",
-    "start": "node --import ./register-paths.mjs dist/main.js",
+    "start": "node server.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/ --ext .ts,.tsx",
