@@ -1,0 +1,11 @@
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm install --legacy-peer-deps && npm run build"
+  },
+  "deploy": {
+    "startCommand": "node server.mjs",
+    "healthcheckPath": "/api/status",
+    "healthcheckTimeout": 30
+  }
+}
