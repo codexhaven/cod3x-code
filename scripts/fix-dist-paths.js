@@ -55,6 +55,12 @@ async function fixFile(filePath) {
   const prefix = depth === 0 ? './' : Array(depth).fill('..').join('/') + '/';
 
   // Replace @/ prefix with relative path
+    // Add .js extensions to relative imports that lack them
+  content = content.replace(
+    /from\s+['"](\.[^'"]+?)(?<!\.js)(?<!\.ts)['"]/g,
+    "from '$1.js'"
+  );
+
   content = content.replace(
     /from\s+['"](@[^'"]+)['"]|import\s+['"](@[^'"]+)['"]/g,
     (match, fromPath, importPath) => {
