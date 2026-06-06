@@ -1,0 +1,1 @@
+{"version":3,"file":"use-trail.d.ts","sourceRoot":"","sources":["../../src/hooks/use-trail.ts"],"names":[],"mappings":"AAAA;;;;;;;GAOG;AAGH,OAAO,EAAE,MAAM,EAAE,MAAM,EAAyB,MAAM,oBAAoB,CAAC;AAE3E,UAAU,eAAe;IACvB,MAAM,EAAE,MAAM,CAAC;IACf,MAAM,EAAE,MAAM,CAAC;CAChB;AAED,wBAAgB,QAAQ,CAAC,EAAE,MAAM,EAAE,MAAM,EAAE,EAAE,eAAe;;;;;;;;EAgE3D;AAED,eAAe,QAAQ,CAAC"}
