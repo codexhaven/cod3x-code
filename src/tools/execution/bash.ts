@@ -124,7 +124,7 @@ export const definition: ToolDefinition = {
     } catch (error: any) {
       return {
         success: false,
-        output: error.stdout?.slice(0, context.config.limits.maxOutputSize) || '',
+        output: error.stdout?.toString().slice(0, context.config.limits.maxOutputSize) || '',
         error: error.stderr?.slice(0, 2000) || error.message,
         exitCode: error.code || 1,
         data: { command, cwd, shell: platform.isWindows ? 'cmd' : 'bash' },
