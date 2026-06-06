@@ -381,6 +381,10 @@ async function main() {
   console.log('═══════════════════════════════════════════\n');
 
   const initialized = await initCod3x();
+  if (!initialized) {
+    console.log("⚠️  Running in limited mode - AI features unavailable");
+  }
+
   
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🌐 Web UI: http://localhost:${PORT}`);
