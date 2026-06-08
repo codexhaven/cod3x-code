@@ -30,6 +30,7 @@ export class ConversationMemory {
     async initSQLite() {
         try {
             // Dynamic import to avoid hard dependency
+            // @ts-ignore - optional dependency, fallback to JSON if not available
             const { default: Database } = await import('better-sqlite3');
             this.sqlite = new Database(this.dbPath);
             this.sqlite.exec(`

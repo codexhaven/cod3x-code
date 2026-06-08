@@ -14,8 +14,8 @@ export class OpenCodeProxyProvider {
     id = 'opencode-proxy';
     name = 'OpenCode Free Proxy';
     models = [
-        'deepseek-v4-flash-free',
-        'deepseek-v4-flash-free',
+        'claude-sonnet-4',
+        'claude-sonnet-4.5',
         'gpt-4o',
         'gpt-4o-mini',
         'gemini-2.5-pro',
@@ -28,7 +28,7 @@ export class OpenCodeProxyProvider {
     apiKey;
     logger;
     constructor(proxyURL, apiKey, logger) {
-        this.proxyURL = proxyURL || process.env.OPENCODE_PROXY_URL || 'http://localhost:6446/v1';
+        this.proxyURL = proxyURL || process.env.OPENCODE_PROXY_URL || 'http://localhost:8000/v1';
         this.apiKey = apiKey || process.env.OPENCODE_PROXY_KEY || 'not-needed';
         this.logger = logger || console;
     }
@@ -36,9 +36,6 @@ export class OpenCodeProxyProvider {
      * Check if the proxy is available
      */
     async isAvailable() {
-        return true;
-    }
-    async _isAvailable() {
         return new Promise((resolve) => {
             try {
                 const url = new URL(this.proxyURL);
@@ -66,7 +63,7 @@ export class OpenCodeProxyProvider {
      */
     async chat(messages, options) {
         const data = JSON.stringify({
-            model: options?.model || 'deepseek-v4-flash-free',
+            model: options?.model || 'claude-sonnet-4',
             messages: messages.map(m => ({
                 role: m.role,
                 content: m.content,
@@ -86,7 +83,7 @@ export class OpenCodeProxyProvider {
      */
     async stream(messages, onToken, options) {
         const data = JSON.stringify({
-            model: options?.model || 'deepseek-v4-flash-free',
+            model: options?.model || 'claude-sonnet-4',
             messages: messages.map(m => ({
                 role: m.role,
                 content: m.content,
@@ -108,24 +105,6 @@ export class OpenCodeProxyProvider {
      * Make a non-streaming HTTP request
      */
     makeRequest(data) {
-        return this._makeRequestWithRetry(data, 3);
-    }
-    _makeRequestWithRetry(data, retries) {
-        return new Promise((resolve, reject) => {
-            const attempt = (remaining) => {
-                this._doRequest(data).then(resolve).catch(e => {
-                    if (remaining > 1) {
-                        console.log('  ⚠️ Retry ' + (4-remaining) + '/3: ' + e.message);
-                        setTimeout(() => attempt(remaining - 1), 1000);
-                    } else {
-                        reject(e);
-                    }
-                });
-            };
-            attempt(retries);
-        });
-    }
-    _doRequest(data) {
         return new Promise((resolve, reject) => {
             const url = new URL(this.proxyURL + '/chat/completions');
             const client = url.protocol === 'https:' ? https : http;

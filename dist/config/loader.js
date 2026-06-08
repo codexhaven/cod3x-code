@@ -64,7 +64,7 @@ export class ConfigLoader {
     applyPlatformDefaults(platform) {
         switch (platform) {
             case 'termux':
-                this.config.ai.opencodeProxyURL = process.env.OPENCODE_PROXY_URL || 'http://localhost:6446/v1';
+                this.config.ai.opencodeProxyURL = process.env.OPENCODE_PROXY_URL || 'http://localhost:8000/v1';
                 this.config.browser.enabled = false;
                 this.config.features.browser = false;
                 this.config.platform.adaptForMobile = true;

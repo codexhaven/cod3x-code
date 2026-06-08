@@ -100,7 +100,7 @@ export const definition = {
                 windowsHide: platform.isWindows,
             };
             const { stdout, stderr } = await execAsync(command, execOptions);
-            const output = stdout || stderr || '(no output)';
+            const output = (stdout || stderr || "(no output)").toString();
             return {
                 success: true,
                 output: output.slice(0, context.config.limits.maxOutputSize),
@@ -110,7 +110,7 @@ export const definition = {
         catch (error) {
             return {
                 success: false,
-                output: error.stdout?.slice(0, context.config.limits.maxOutputSize) || '',
+                output: error.stdout?.toString().slice(0, context.config.limits.maxOutputSize) || '',
                 error: error.stderr?.slice(0, 2000) || error.message,
                 exitCode: error.code || 1,
                 data: { command, cwd, shell: platform.isWindows ? 'cmd' : 'bash' },

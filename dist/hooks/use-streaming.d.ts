@@ -13,8 +13,8 @@ interface UseStreamingOptions {
     llmFactory: LLMProviderFactory;
 }
 export declare function useStreaming({ config, logger, llmFactory }: UseStreamingOptions): {
-    streamResponse: any;
-    isStreaming: any;
+    streamResponse: (prompt: string) => Promise<string>;
+    isStreaming: boolean;
 };
 export default useStreaming;
 //# sourceMappingURL=use-streaming.d.ts.map

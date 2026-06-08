@@ -4,17 +4,17 @@
  * Developed by CodexHaven
  * ═══════════════════════════════════════════════════════════════
  */
-import { Config, Logger, ConversationMemory } from '@codex-types/index';
+import { ChatMessage, Config, Logger, ConversationMemory } from '@codex-types/index';
 interface UseConversationOptions {
     config: Config;
     logger: Logger;
     memory: ConversationMemory;
 }
 export declare function useConversation({ config, logger, memory }: UseConversationOptions): {
-    messages: any;
-    sendMessage: any;
-    clearMessages: any;
-    compact: any;
+    messages: ChatMessage[];
+    sendMessage: (content: string, role?: ChatMessage["role"]) => void;
+    clearMessages: () => void;
+    compact: () => Promise<void>;
 };
 export default useConversation;
 //# sourceMappingURL=use-conversation.d.ts.map

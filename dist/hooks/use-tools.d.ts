@@ -4,7 +4,7 @@
  * Developed by CodexHaven
  * ═══════════════════════════════════════════════════════════════
  */
-import { ToolRegistry, PermissionManager, Logger, Config, LLMProviderFactory, PlatformInfo } from '@codex-types/index';
+import { ToolRegistry, PermissionManager, Logger, Config, ToolResult, LLMProviderFactory, PlatformInfo } from '@codex-types/index';
 interface UseToolsOptions {
     toolRegistry: ToolRegistry;
     permissions: PermissionManager;
@@ -14,8 +14,8 @@ interface UseToolsOptions {
     platform: PlatformInfo;
 }
 export declare function useTools({ toolRegistry, permissions, logger, config, llmFactory, platform }: UseToolsOptions): {
-    executeTool: any;
-    executingTools: any;
+    executeTool: (name: string, params: Record<string, unknown>) => Promise<ToolResult>;
+    executingTools: string[];
 };
 export default useTools;
 //# sourceMappingURL=use-tools.d.ts.map

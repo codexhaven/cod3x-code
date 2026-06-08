@@ -8,7 +8,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  * browser integration, and debug trail visualization
  * ═══════════════════════════════════════════════════════════════
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { ChatInterface } from '../ui/chat.js';
 import { StatusBar } from '../ui/status-bar.js';

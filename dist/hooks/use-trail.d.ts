@@ -6,19 +6,19 @@
  * Execution tracing and debugging trail system
  * ═══════════════════════════════════════════════════════════════
  */
-import { Config, Logger } from '@codex-types/index';
+import { Config, Logger, DebugTrail, TrailStep } from '@codex-types/index';
 interface UseTrailOptions {
     config: Config;
     logger: Logger;
 }
 export declare function useTrail({ config, logger }: UseTrailOptions): {
-    trail: any;
-    addStep: any;
-    isRecording: any;
-    startTrail: any;
-    stopTrail: any;
-    pauseTrail: any;
-    exportTrail: any;
+    trail: DebugTrail;
+    addStep: (type: TrailStep["type"], description: string, data?: Record<string, unknown>) => void;
+    isRecording: boolean;
+    startTrail: () => void;
+    stopTrail: () => void;
+    pauseTrail: () => void;
+    exportTrail: () => string;
 };
 export default useTrail;
 //# sourceMappingURL=use-trail.d.ts.map

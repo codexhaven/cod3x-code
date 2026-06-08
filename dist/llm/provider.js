@@ -28,7 +28,7 @@ export class LLMProviderFactory {
      */
     initializeProviders() {
         // Primary: OpenCode Free Proxy (default)
-        this.providers.set('opencode-proxy', new OpenCodeProxyProvider(this.config.ai.opencodeProxyURL, process.env.OPENCODE_PROXY_KEY || 'oc-c7a9138bb7c0eb8855c3453bef389837f983c169', this.logger));
+        this.providers.set('opencode-proxy', new OpenCodeProxyProvider(this.config.ai.opencodeProxyURL, this.config.ai.customApiKey, this.logger));
         // Anthropic (direct API)
         this.providers.set('anthropic', new AnthropicProvider(process.env.ANTHROPIC_API_KEY, undefined, this.logger));
         // OpenAI (direct API)
@@ -36,7 +36,7 @@ export class LLMProviderFactory {
         // OpenRouter (access to 200+ models)
         this.providers.set('openrouter', new OpenRouterProvider(process.env.OPENROUTER_API_KEY, undefined, this.logger));
         // Custom/OpenAI-compatible endpoint
-        this.providers.set('custom', new CustomProvider(this.config.ai.customBaseURL, process.env.OPENCODE_PROXY_KEY || 'oc-c7a9138bb7c0eb8855c3453bef389837f983c169', this.logger));
+        this.providers.set('custom', new CustomProvider(this.config.ai.customBaseURL, this.config.ai.customApiKey, this.logger));
         // Build fallback chain: primary -> fallback -> openrouter -> custom -> opencode-proxy
         this.fallbackChain = [
             this.config.ai.provider,
