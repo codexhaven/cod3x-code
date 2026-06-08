@@ -4,6 +4,10 @@ logs/
 *.cod3x.log
 .cod3x-memory.json
 
+# Portable runtime directories (populated at runtime)
+data/
+engine/
+
 # Dependencies
 node_modules/
 
@@ -24,6 +28,3 @@ build/
 .DS_Store
 Thumbs.db
 .codex/
-logs/
-*.cod3x.log
-.cod3x-memory.json

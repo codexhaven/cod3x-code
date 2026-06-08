@@ -2,15 +2,18 @@
  * ═══════════════════════════════════════════════════════════════
  * Enhanced Configuration Loader - Cod3x Code v4.0
  * Developed by CodexHaven
- * 
- * Three-level config with platform auto-detection
- * Global → Local → Project hierarchy with environment overrides
+ *
+ * Three-level config with platform auto-detection and portable mode
+ * Global -> Local -> Project hierarchy with environment overrides
+ * Portable mode: all data stays in ./data/ relative to executable
  * ═══════════════════════════════════════════════════════════════
  */
 
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import os from 'os';
+import { fileURLToPath } from 'url';
 import { Config, PlatformType } from '@codex-types/index';
 import { defaultConfig } from './defaults';
 import { PlatformDetector } from '@platform/detector';
@@ -22,10 +25,55 @@ export class ConfigLoader {
   private config: Config;
   private loadedPaths: string[] = [];
   private platformDetector: PlatformDetector;
+  private configHome: string = path.join(os.homedir(), CONFIG_DIR);
+  private dataHome: string = path.join(os.homedir(), CONFIG_DIR);
+  private portableRoot: string | null = null;
 
   constructor() {
     this.config = this.deepClone(defaultConfig);
     this.platformDetector = PlatformDetector.getInstance();
+  }
+
+  /**
+   * Detect portable mode by checking for data/ directory sibling to executable
+   */
+  private getPortableRoot(): string | null {
+    // Already detected
+    if (this.portableRoot) return this.portableRoot;
+
+    // Check explicit env var
+    if (process.env.COD3X_PORTABLE_ROOT) {
+      this.portableRoot = process.env.COD3X_PORTABLE_ROOT;
+      return this.portableRoot;
+    }
+
+    // Check if data/ directory exists as sibling to executable
+    try {
+      const exeDir = path.dirname(process.argv[1] || process.execPath);
+      const possibleData = path.resolve(exeDir, '..', 'data');
+      if (fsSync.existsSync(possibleData)) {
+        this.portableRoot = path.resolve(exeDir, '..');
+        return this.portableRoot;
+      }
+
+      // Also check cwd (for development/testing)
+      const cwdData = path.resolve(process.cwd(), 'data');
+      if (fsSync.existsSync(cwdData)) {
+        this.portableRoot = process.cwd();
+        return this.portableRoot;
+      }
+    } catch {
+      // Standard mode
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if running in portable mode
+   */
+  isPortable(): boolean {
+    return this.getPortableRoot() !== null;
   }
 
   /**
@@ -34,17 +82,36 @@ export class ConfigLoader {
   async load(cwd: string = process.cwd()): Promise<Config> {
     this.loadedPaths = [];
 
-    // Detect platform first
+    // Detect portable mode first
+    const portableRoot = this.getPortableRoot();
+
+    if (portableRoot) {
+      // Portable mode: use ./data/ paths
+      this.configHome = path.join(portableRoot, 'data', 'config');
+      this.dataHome = path.join(portableRoot, 'data');
+
+      // Ensure directories exist
+      await fs.mkdir(this.configHome, { recursive: true });
+      await fs.mkdir(path.join(this.dataHome, 'memory'), { recursive: true });
+      await fs.mkdir(path.join(this.dataHome, 'logs'), { recursive: true });
+      await fs.mkdir(path.join(this.dataHome, 'tmp'), { recursive: true });
+    } else {
+      // Standard mode: use home directory
+      this.configHome = os.homedir();
+      this.dataHome = path.join(os.homedir(), CONFIG_DIR);
+    }
+
+    // Detect platform
     const platformInfo = await this.platformDetector.detect();
     this.config.platform.type = platformInfo.type;
     this.config.platform.shell = platformInfo.shell;
     this.config.platform.maxConcurrency = platformInfo.maxConcurrency;
 
     // Level 1: Global config
-    await this.loadLevel(path.join(os.homedir(), CONFIG_FILE_NAME));
+    await this.loadLevel(path.join(this.configHome, CONFIG_FILE_NAME));
 
     // Level 2: Local config (machine-specific, not in git)
-    await this.loadLevel(path.join(os.homedir(), CONFIG_DIR, 'config.local.json'));
+    await this.loadLevel(path.join(this.dataHome, 'config.local.json'));
 
     // Level 3: Project config
     await this.loadLevel(path.join(cwd, CONFIG_FILE_NAME));
@@ -146,10 +213,22 @@ export class ConfigLoader {
   }
 
   /**
-   * Save current configuration to project level
+   * Save current configuration
+   * - In portable mode: saves to data/config/
+   * - In standard mode: saves to cwd
    */
   async save(cwd: string = process.cwd()): Promise<void> {
-    const configPath = path.join(cwd, CONFIG_FILE_NAME);
+    const portableRoot = this.getPortableRoot();
+    let configPath: string;
+
+    if (portableRoot) {
+      // Portable mode: always save to data/config/
+      configPath = path.join(portableRoot, 'data', 'config', CONFIG_FILE_NAME);
+    } else {
+      // Standard mode: save to project level
+      configPath = path.join(cwd, CONFIG_FILE_NAME);
+    }
+
     await fs.writeFile(configPath, JSON.stringify(this.config, null, 2), 'utf-8');
   }
 
@@ -168,9 +247,64 @@ export class ConfigLoader {
   }
 
   /**
-   * Initialize default configuration in current directory
+   * Initialize default configuration
+   * - In portable mode: creates data/config/, data/memory/, data/logs/, data/tmp/
+   * - In standard mode: creates .cod3x/ directory in cwd
    */
   async init(cwd: string = process.cwd()): Promise<void> {
+    const portableRoot = this.getPortableRoot();
+
+    if (portableRoot) {
+      // Portable mode init
+      const configDir = path.join(portableRoot, 'data', 'config');
+      const configPath = path.join(configDir, CONFIG_FILE_NAME);
+
+      try {
+        await fs.access(configPath);
+        console.log('⚠️  Cod3x is already initialized. Use --force to overwrite.');
+        return;
+      } catch {
+        // Not initialized, continue
+      }
+
+      const platformInfo = await this.platformDetector.detect();
+      const projectConfig = {
+        name: path.basename(cwd),
+        version: '1.0.0',
+        platform: {
+          type: platformInfo.type,
+          autoDetect: true,
+        },
+        ai: {
+          provider: 'opencode-proxy',
+          model: 'claude-sonnet-4',
+        },
+        created: new Date().toISOString(),
+        by: 'CodexHaven Cod3x Code v4.0',
+      };
+
+      await fs.writeFile(configPath, JSON.stringify(projectConfig, null, 2), 'utf-8');
+
+      // Create portable data directories
+      const dataDir = path.join(portableRoot, 'data');
+      await fs.mkdir(path.join(dataDir, 'memory'), { recursive: true });
+      await fs.mkdir(path.join(dataDir, 'logs'), { recursive: true });
+      await fs.mkdir(path.join(dataDir, 'tmp'), { recursive: true });
+      await fs.mkdir(path.join(dataDir, 'ollama'), { recursive: true });
+
+      console.log('✓ Created portable configuration in data/config/.cod3xrc');
+      console.log('✓ Created data/ directory structure');
+      console.log('\n✨ Cod3x by CodexHaven initialized successfully (portable mode)!\n');
+      console.log('All data stays in: ' + dataDir);
+      console.log('\nNext steps:');
+      console.log('  1. Run cod3x to start the interactive session');
+      console.log('  2. Edit data/config/.cod3xrc to customize behavior');
+      console.log('  3. Install opencode-free-proxy for free AI access');
+      console.log('     -> https://github.com/sionex-code/opencode-proxy-api');
+      return;
+    }
+
+    // Standard mode init
     const configPath = path.join(cwd, CONFIG_FILE_NAME);
 
     try {
@@ -227,7 +361,7 @@ export class ConfigLoader {
     console.log('  1. Run `cod3x` to start the interactive session');
     console.log('  2. Edit .cod3xrc to customize behavior');
     console.log('  3. Install opencode-free-proxy for free AI access');
-    console.log('     → https://github.com/sionex-code/opencode-proxy-api');
+    console.log('     -> https://github.com/sionex-code/opencode-proxy-api');
   }
 
   private deepMerge(target: any, source: any): any {

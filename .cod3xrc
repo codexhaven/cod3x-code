@@ -1,8 +1,0 @@
-{
-  "ai": {
-    "provider": "opencode-proxy",
-    "model": "deepseek-v4-flash-free",
-    "opencodeProxyURL": "http://localhost:6446/v1",
-    "customApiKey": "oc-c7a9138bb7c0eb8855c3453bef389837f983c169"
-  }
-}

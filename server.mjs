@@ -3,10 +3,17 @@
  * ═══════════════════════════════════════════════════════════════
  * Cod3x Web Server - Cod3x Code v4.0
  * Developed by CodexHaven
- * 
+ *
  * Standalone web server that serves a clean web UI and connects
  * to the REAL Cod3x agent system via compiled dist/ code.
- * 
+ *
+ * Hardened for portable mode:
+ * - Binds to 127.0.0.1 by default (localhost only)
+ * - Optional token auth in portable mode
+ * - Session cleanup to prevent memory leaks
+ * - Health check endpoint
+ * - Graceful error handling (no top-level await crash)
+ *
  * Usage: node server.mjs [port]
  * Default port: 9000
  * ═══════════════════════════════════════════════════════════════
@@ -15,6 +22,7 @@
 import http from 'http';
 import https from 'https';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -23,11 +31,72 @@ import os from 'os';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.argv[2] || process.env.COD3X_PORT || '9000', 10);
 
+// ─── Determine bind address ───
+const BIND_HOST = process.env.COD3X_BIND_ALL === '1' ? '0.0.0.0' : '127.0.0.1';
+
+// ─── Token auth for portable mode ───
+const PORTABLE_TOKEN = process.env.COD3X_PORTABLE_TOKEN || null;
+
 // ─── State ───
 let cod3x = null;
 let serverStartTime = Date.now();
 let requestCount = 0;
 let chatSessions = new Map();
+
+// ─── Logger ───
+async function serverLog(level, message, data) {
+  const timestamp = new Date().toISOString();
+  const entry = `[${timestamp}] [${level.toUpperCase()}] ${message}${data ? ' ' + JSON.stringify(data).slice(0, 500) : ''}`;
+
+  // Console output for startup messages only
+  if (level === 'info' || level === 'error') {
+    console.log(entry);
+  }
+
+  // Write to log file
+  try {
+    const logDir = process.env.COD3X_HOME ? path.join(process.env.COD3X_HOME, 'logs') : path.join(__dirname, 'logs');
+    const logFile = path.join(logDir, 'server.log');
+    await fs.mkdir(logDir, { recursive: true });
+    await fs.appendFile(logFile, entry + '\n');
+  } catch {
+    // Silent fail for logging
+  }
+}
+
+// ─── Token Auth Middleware ───
+function checkAuth(req, res) {
+  if (!PORTABLE_TOKEN) return true; // No auth configured
+
+  // Skip auth for health check and root
+  if (req.url === '/api/health' || req.url === '/' || req.url === '/index.html') return true;
+
+  // Check X-Cod3x-Token header
+  const token = req.headers['x-cod3x-token'];
+  if (token !== PORTABLE_TOKEN) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: false, error: 'Unauthorized. Set X-Cod3x-Token header.' }));
+    return false;
+  }
+
+  return true;
+}
+
+// ─── Session Cleanup ───
+function cleanupSessions() {
+  if (chatSessions.size > 100) {
+    // Sort by last activity and remove oldest 20
+    const entries = Array.from(chatSessions.entries())
+      .sort((a, b) => (a[1].lastActivity || a[1].createdAt) - (b[1].lastActivity || b[1].createdAt));
+
+    const toRemove = entries.slice(0, 20);
+    for (const [key] of toRemove) {
+      chatSessions.delete(key);
+    }
+
+    serverLog('info', 'Cleaned up old sessions', { removed: toRemove.length, remaining: chatSessions.size });
+  }
+}
 
 // ─── Initialize Cod3x Backend ───
 async function initCod3x() {
@@ -92,6 +161,7 @@ async function initCod3x() {
       llmFactory,
       agentOrchestrator,
       platform: platformInfo,
+      configLoader,
     };
 
     console.log(`✅ Cod3x backend initialized`);
@@ -119,6 +189,21 @@ async function initCod3x() {
 
 // ─── API Handlers ───
 const apiHandlers = {
+  // GET /api/health - Always works, even if backend failed
+  async health() {
+    return {
+      success: true,
+      data: {
+        status: 'ok',
+        version: '4.0.0',
+        cod3xInitialized: cod3x !== null,
+        uptime: Date.now() - serverStartTime,
+        requests: requestCount,
+        sessions: chatSessions.size,
+      },
+    };
+  },
+
   // GET /api/status
   async status() {
     const llmStatus = cod3x ? await cod3x.llmFactory.checkAvailability() : [];
@@ -170,12 +255,16 @@ const apiHandlers = {
   // POST /api/chat
   async chat(body) {
     if (!cod3x) return { success: false, error: 'Cod3x not initialized' };
-    
+
     const { message, sessionId = 'default', model, temperature } = body;
     if (!message) return { success: false, error: 'Message is required' };
 
-    const session = chatSessions.get(sessionId) || { messages: [], createdAt: Date.now() };
+    // Session cleanup
+    cleanupSessions();
+
+    const session = chatSessions.get(sessionId) || { messages: [], createdAt: Date.now(), lastActivity: Date.now() };
     session.messages.push({ role: 'user', content: message, timestamp: Date.now() });
+    session.lastActivity = Date.now();
     chatSessions.set(sessionId, session);
 
     try {
@@ -227,7 +316,7 @@ Provide complete, working solutions with error handling.`;
   // POST /api/tool/:name
   async executeTool(body, params) {
     if (!cod3x) return { success: false, error: 'Cod3x not initialized' };
-    
+
     const { name } = params;
     const toolParams = body.params || body;
 
@@ -288,17 +377,89 @@ Provide complete, working solutions with error handling.`;
       },
     };
   },
+
+  // GET /api/sessions
+  async listSessions() {
+    const sessions = Array.from(chatSessions.entries()).map(([id, session]) => ({
+      id,
+      messageCount: session.messages.length,
+      createdAt: session.createdAt,
+      lastActivity: session.lastActivity,
+    }));
+    return { success: true, data: { count: sessions.length, sessions } };
+  },
 };
+
+// ─── Load HTML UI ───
+let HTML_UI = '';
+try {
+  HTML_UI = await fs.readFile(path.join(__dirname, 'index.html'), 'utf-8');
+} catch (error) {
+  console.log('⚠️  index.html not found, using fallback UI');
+  HTML_UI = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cod3x Code v4.0</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+      background: #0a0a0a; color: #e0e0e0;
+      display: flex; justify-content: center; align-items: center;
+      height: 100vh; text-align: center;
+    }
+    .container { max-width: 600px; padding: 2rem; }
+    h1 { font-size: 3rem; color: #00D4AA; margin-bottom: 1rem; }
+    p { color: #888; line-height: 1.6; margin-bottom: 1rem; }
+    .status { display: inline-block; padding: 0.5rem 1rem; border-radius: 4px; font-size: 0.875rem; }
+    .status.ok { background: rgba(0, 212, 170, 0.1); color: #00D4AA; }
+    .status.error { background: rgba(255, 68, 68, 0.1); color: #ff4444; }
+    .api { margin-top: 2rem; font-size: 0.75rem; color: #555; }
+    .api code { background: #1a1a1a; padding: 0.25rem 0.5rem; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Cod3x Code v4.0</h1>
+    <p>Developed by <strong style="color:#00D4AA;">CodexHaven</strong></p>
+    <p>The Open-Source Claude Code Alternative</p>
+    <div class="status ok" id="status">Server Running</div>
+    <div class="api">
+      <p>API Endpoints:</p>
+      <p><code>GET /api/health</code> - Health check</p>
+      <p><code>POST /api/chat</code> - Chat interface</p>
+      <p><code>GET /api/tools</code> - List tools</p>
+    </div>
+  </div>
+  <script>
+    fetch('/api/health')
+      .then(r => r.json())
+      .then(d => {
+        const el = document.getElementById('status');
+        el.textContent = d.data?.cod3xInitialized ? 'Cod3x Ready' : 'Limited Mode';
+        el.className = d.data?.cod3xInitialized ? 'status ok' : 'status error';
+      })
+      .catch(() => {
+        const el = document.getElementById('status');
+        el.textContent = 'Connection Error';
+        el.className = 'status error';
+      });
+  </script>
+</body>
+</html>`;
+}
 
 // ─── HTTP Server ───
 const server = http.createServer(async (req, res) => {
   requestCount++;
-  
+
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Cod3x-Token');
+
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
@@ -317,8 +478,11 @@ const server = http.createServer(async (req, res) => {
 
   // API routes
   if (pathname.startsWith('/api/')) {
+    // Check auth for portable mode
+    if (!checkAuth(req, res)) return;
+
     const route = pathname.slice(5); // Remove /api/
-    
+
     try {
       let body = {};
       if (req.method === 'POST') {
@@ -330,6 +494,9 @@ const server = http.createServer(async (req, res) => {
 
       let result;
       switch (route) {
+        case 'health':
+          result = await apiHandlers.health();
+          break;
         case 'status':
           result = await apiHandlers.status();
           break;
@@ -347,6 +514,9 @@ const server = http.createServer(async (req, res) => {
           break;
         case 'config':
           result = await apiHandlers.getConfig();
+          break;
+        case 'sessions':
+          result = await apiHandlers.listSessions();
           break;
         default:
           // Check for /api/tool/:name
@@ -372,23 +542,27 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ success: false, error: 'Not found' }));
 });
 
-// ─── HTML UI ───
-const HTML_UI = await fs.readFile(path.join(__dirname, 'index.html'), 'utf-8');
-
 // ─── Start ───
 async function main() {
   console.log('\n🔷 Cod3x Code v4.0 Web Server by CodexHaven');
   console.log('═══════════════════════════════════════════\n');
+
+  if (PORTABLE_TOKEN) {
+    console.log('🔒 Portable token auth enabled');
+  }
+  console.log(`📡 Binding to: ${BIND_HOST}:${PORT}`);
 
   const initialized = await initCod3x();
   if (!initialized) {
     console.log("⚠️  Running in limited mode - AI features unavailable");
   }
 
-  
-  server.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, BIND_HOST, () => {
     console.log(`\n🌐 Web UI: http://localhost:${PORT}`);
     console.log(`📡 API: http://localhost:${PORT}/api`);
+    if (BIND_HOST === '127.0.0.1') {
+      console.log('🔒 Localhost only (set COD3X_BIND_ALL=1 to allow remote access)');
+    }
     console.log(`\nPress Ctrl+C to stop\n`);
   });
 }

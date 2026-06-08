@@ -2,16 +2,27 @@
  * ═══════════════════════════════════════════════════════════════
  * Enhanced Conversation Memory - Cod3x Code v4.0
  * Developed by CodexHaven
- * 
+ *
  * Persistent conversation storage with SQLite (when available)
- * and JSON file fallback for all platforms including Termux
+ * and JSON file fallback for all platforms including Termux.
+ * Supports session-based save/load for portable mode.
  * ═══════════════════════════════════════════════════════════════
  */
 
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import os from 'os';
 import { ConversationMemory as IConversationMemory, ChatMessage, MemoryEntry } from '@codex-types/index';
+
+interface SessionData {
+  messages: ChatMessage[];
+  timestamp: string;
+  model?: string;
+  provider?: string;
+  updated: string;
+  version: string;
+}
 
 export class ConversationMemory implements IConversationMemory {
   private messages: ChatMessage[] = [];
@@ -21,10 +32,12 @@ export class ConversationMemory implements IConversationMemory {
   private dbPath: string;
   private sqlite: any = null;
   private useSQLite: boolean = false;
+  private currentSessionId: string | null = null;
 
   constructor(cwd: string = process.cwd()) {
-    // Use .cod3x directory for storage if it exists, otherwise cwd
-    const cod3xDir = path.join(cwd, '.cod3x', 'memory');
+    // Determine base path: portable mode or standard
+    const dataHome = process.env.COD3X_HOME || path.join(cwd, '.cod3x');
+    const cod3xDir = path.join(dataHome, 'memory');
     this.memoryPath = path.join(cod3xDir, 'conversations.json');
     this.dbPath = path.join(cod3xDir, 'memory.db');
 
@@ -55,8 +68,15 @@ export class ConversationMemory implements IConversationMemory {
           timestamp INTEGER NOT NULL,
           importance REAL DEFAULT 0.5
         );
+        CREATE TABLE IF NOT EXISTS sessions (
+          id TEXT PRIMARY KEY,
+          data TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
         CREATE INDEX IF NOT EXISTS idx_messages_time ON messages(timestamp);
         CREATE INDEX IF NOT EXISTS idx_entries_type ON memory_entries(type);
+        CREATE INDEX IF NOT EXISTS idx_sessions_id ON sessions(id);
       `);
       this.useSQLite = true;
     } catch {
@@ -100,7 +120,7 @@ export class ConversationMemory implements IConversationMemory {
 
   async compact(): Promise<void> {
     if (this.messages.length <= 10) return;
-    
+
     const summary = `[Summary of ${this.messages.length} messages by Cod3x]`;
     this.messages = [{ role: 'system', content: summary }];
     this.tokenCount = summary.length / 4;
@@ -191,6 +211,153 @@ export class ConversationMemory implements IConversationMemory {
     } catch {
       // No saved memory, start fresh
     }
+  }
+
+  // ─── Session Management ───
+
+  /**
+   * Save current conversation as a named session
+   */
+  async saveSession(sessionId: string): Promise<void> {
+    const dataHome = process.env.COD3X_HOME || path.join(process.cwd(), '.cod3x');
+    const sessionsDir = path.join(dataHome, 'memory', 'conversations', sessionId);
+
+    try {
+      await fs.mkdir(sessionsDir, { recursive: true });
+
+      const sessionData: SessionData = {
+        messages: this.messages,
+        timestamp: new Date().toISOString(),
+        model: process.env.COD3X_MODEL,
+        provider: process.env.COD3X_PROVIDER,
+        updated: new Date().toISOString(),
+        version: '2.0',
+      };
+
+      await fs.writeFile(
+        path.join(sessionsDir, 'session.json'),
+        JSON.stringify(sessionData, null, 2),
+        'utf-8'
+      );
+
+      this.currentSessionId = sessionId;
+    } catch {
+      // Silent fail
+    }
+
+    // Also save to SQLite if available
+    if (this.useSQLite && this.sqlite) {
+      try {
+        const stmt = this.sqlite.prepare(`
+          INSERT OR REPLACE INTO sessions (id, data, created_at, updated_at)
+          VALUES (?, ?, ?, ?)
+        `);
+        stmt.run(
+          sessionId,
+          JSON.stringify({
+            messages: this.messages,
+            model: process.env.COD3X_MODEL,
+            provider: process.env.COD3X_PROVIDER,
+          }),
+          Date.now(),
+          Date.now()
+        );
+      } catch {
+        // Fall through
+      }
+    }
+  }
+
+  /**
+   * Load a named session
+   */
+  async loadSession(sessionId: string): Promise<boolean> {
+    const dataHome = process.env.COD3X_HOME || path.join(process.cwd(), '.cod3x');
+    const sessionsDir = path.join(dataHome, 'memory', 'conversations', sessionId);
+
+    // Try JSON file first
+    try {
+      const sessionPath = path.join(sessionsDir, 'session.json');
+      const content = await fs.readFile(sessionPath, 'utf-8');
+      const data: SessionData = JSON.parse(content);
+
+      this.messages = data.messages || [];
+      this.tokenCount = this.messages.reduce((sum, m) => sum + m.content.length / 4, 0);
+      this.currentSessionId = sessionId;
+      return true;
+    } catch {
+      // File not found, try SQLite
+    }
+
+    // Try SQLite
+    if (this.useSQLite && this.sqlite) {
+      try {
+        const stmt = this.sqlite.prepare('SELECT data FROM sessions WHERE id = ?');
+        const row = stmt.get(sessionId);
+        if (row) {
+          const data = JSON.parse(row.data);
+          this.messages = data.messages || [];
+          this.tokenCount = this.messages.reduce((sum, m) => sum + m.content.length / 4, 0);
+          this.currentSessionId = sessionId;
+          return true;
+        }
+      } catch {
+        // Fall through
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * List all available session IDs
+   */
+  async listSessions(): Promise<string[]> {
+    const sessions: string[] = [];
+    const dataHome = process.env.COD3X_HOME || path.join(process.cwd(), '.cod3x');
+    const conversationsDir = path.join(dataHome, 'memory', 'conversations');
+
+    // Read directory-based sessions
+    try {
+      const entries = await fs.readdir(conversationsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          // Verify it has a session.json
+          try {
+            await fs.access(path.join(conversationsDir, entry.name, 'session.json'));
+            sessions.push(entry.name);
+          } catch {
+            // Not a valid session directory
+          }
+        }
+      }
+    } catch {
+      // Directory doesn't exist yet
+    }
+
+    // Also check SQLite sessions
+    if (this.useSQLite && this.sqlite) {
+      try {
+        const stmt = this.sqlite.prepare('SELECT id FROM sessions ORDER BY updated_at DESC');
+        const rows: { id: string }[] = stmt.all();
+        for (const row of rows) {
+          if (!sessions.includes(row.id)) {
+            sessions.push(row.id);
+          }
+        }
+      } catch {
+        // Fall through
+      }
+    }
+
+    return sessions;
+  }
+
+  /**
+   * Get current session ID if any
+   */
+  getCurrentSessionId(): string | null {
+    return this.currentSessionId;
   }
 
   /**
