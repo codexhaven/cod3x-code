@@ -4,7 +4,8 @@
  * Developed by CodexHaven
  *
  * Persistent conversation storage with SQLite (when available)
- * and JSON file fallback for all platforms including Termux
+ * and JSON file fallback for all platforms including Termux.
+ * Supports session-based save/load for portable mode.
  * ═══════════════════════════════════════════════════════════════
  */
 import { ConversationMemory as IConversationMemory, ChatMessage, MemoryEntry } from '@codex-types/index';
@@ -16,6 +17,7 @@ export declare class ConversationMemory implements IConversationMemory {
     private dbPath;
     private sqlite;
     private useSQLite;
+    private currentSessionId;
     constructor(cwd?: string);
     private initSQLite;
     addMessage(role: ChatMessage['role'], content: string): Promise<void>;
@@ -26,6 +28,22 @@ export declare class ConversationMemory implements IConversationMemory {
     search(query: string, limit?: number): MemoryEntry[];
     private persist;
     load(): Promise<void>;
+    /**
+     * Save current conversation as a named session
+     */
+    saveSession(sessionId: string): Promise<void>;
+    /**
+     * Load a named session
+     */
+    loadSession(sessionId: string): Promise<boolean>;
+    /**
+     * List all available session IDs
+     */
+    listSessions(): Promise<string[]>;
+    /**
+     * Get current session ID if any
+     */
+    getCurrentSessionId(): string | null;
     /**
      * Get conversation statistics
      */

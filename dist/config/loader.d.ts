@@ -3,8 +3,9 @@
  * Enhanced Configuration Loader - Cod3x Code v4.0
  * Developed by CodexHaven
  *
- * Three-level config with platform auto-detection
- * Global → Local → Project hierarchy with environment overrides
+ * Three-level config with platform auto-detection and portable mode
+ * Global -> Local -> Project hierarchy with environment overrides
+ * Portable mode: all data stays in ./data/ relative to executable
  * ═══════════════════════════════════════════════════════════════
  */
 import { Config } from '@codex-types/index';
@@ -12,7 +13,18 @@ export declare class ConfigLoader {
     private config;
     private loadedPaths;
     private platformDetector;
+    private configHome;
+    private dataHome;
+    private portableRoot;
     constructor();
+    /**
+     * Detect portable mode by checking for data/ directory sibling to executable
+     */
+    private getPortableRoot;
+    /**
+     * Check if running in portable mode
+     */
+    isPortable(): boolean;
     /**
      * Load configuration from all levels with platform detection
      */
@@ -34,7 +46,9 @@ export declare class ConfigLoader {
      */
     private mergeConfig;
     /**
-     * Save current configuration to project level
+     * Save current configuration
+     * - In portable mode: saves to data/config/
+     * - In standard mode: saves to cwd
      */
     save(cwd?: string): Promise<void>;
     /**
@@ -46,7 +60,9 @@ export declare class ConfigLoader {
      */
     getLoadedPaths(): string[];
     /**
-     * Initialize default configuration in current directory
+     * Initialize default configuration
+     * - In portable mode: creates data/config/, data/memory/, data/logs/, data/tmp/
+     * - In standard mode: creates .cod3x/ directory in cwd
      */
     init(cwd?: string): Promise<void>;
     private deepMerge;

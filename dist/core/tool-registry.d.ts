@@ -10,7 +10,20 @@ import { ToolDefinition, ToolRegistry as IToolRegistry, ToolResult, ToolContext 
 export declare class ToolRegistry implements IToolRegistry {
     private tools;
     private context;
+    private permissionsLogPath;
     constructor();
+    /**
+     * Log permission decisions to data/logs/permissions.log
+     */
+    private logPermission;
+    /**
+     * Check if a tool is dangerous and requires explicit approval in portable mode
+     */
+    private isDangerousTool;
+    /**
+     * Check if portable mode safety override applies
+     */
+    private requiresExplicitApproval;
     register(tool: ToolDefinition): void;
     unregister(name: string): void;
     get(name: string): ToolDefinition | undefined;

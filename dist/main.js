@@ -1,11 +1,56 @@
 #!/usr/bin/env node
 import { jsx as _jsx } from "react/jsx-runtime";
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * Cod3x Code v4.0 - Main Entry Point
+ * Developed by CodexHaven - https://github.com/codexhaven/cod3x-code
+ *
+ * The Open-Source Claude Code Alternative
+ * Production-ready AI coding assistant with swarm agents,
+ * 80+ tools, multi-platform support, and browser capabilities.
+ *
+ * PORTABLE MODE: If a data/ directory exists alongside the executable,
+ * all configs, logs, caches, and memory are redirected there.
+ * ═══════════════════════════════════════════════════════════════
+ */
+// ─── PORTABLE MODE BOOTSTRAP (must be first) ───
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import os from 'os';
+// Detect portable mode by checking for data/ directory
+const exeDir = path.dirname(fileURLToPath(import.meta.url));
+const portableData = path.resolve(exeDir, '..', 'data');
+try {
+    if (fs.existsSync(portableData)) {
+        process.env.COD3X_PORTABLE_ROOT = path.resolve(exeDir, '..');
+        process.env.XDG_CONFIG_HOME = path.join(portableData, 'config');
+        process.env.XDG_DATA_HOME = portableData;
+        process.env.COD3X_HOME = portableData;
+        process.env.HOME = portableData; // Prevents ~ expansion to host home
+        process.env.USERPROFILE = portableData; // Windows
+        process.env.TMPDIR = path.join(portableData, 'tmp');
+        process.env.TEMP = path.join(portableData, 'tmp');
+        process.env.TMP = path.join(portableData, 'tmp');
+        process.env.NPM_CONFIG_CACHE = path.join(portableData, 'npm-cache');
+        process.env.NPM_CONFIG_PREFIX = path.resolve(exeDir, '..', 'engine');
+        // Ensure dirs exist
+        fs.mkdirSync(path.join(portableData, 'config'), { recursive: true });
+        fs.mkdirSync(path.join(portableData, 'memory'), { recursive: true });
+        fs.mkdirSync(path.join(portableData, 'logs'), { recursive: true });
+        fs.mkdirSync(path.join(portableData, 'tmp'), { recursive: true });
+    }
+}
+catch { /* standard mode */ }
+// ─── Load environment variables from portable or standard location ───
+import dotenv from 'dotenv';
+const envPath = process.env.COD3X_HOME
+    ? path.join(process.env.COD3X_HOME, 'config', 'ai_settings.env')
+    : path.join(os.homedir(), '.cod3x', 'ai_settings.env');
+dotenv.config({ path: envPath });
 import { render } from 'ink';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import path from 'path';
 import { Cod3xApp } from './core/app.js';
 import { ConfigLoader } from './config/loader.js';
 import { ToolRegistry } from './core/tool-registry.js';
@@ -17,8 +62,6 @@ import { PermissionManager } from './utils/permissions.js';
 import { FileIndex } from './context/file-index.js';
 import { PlatformDetector } from './platform/detector.js';
 import { LLMProviderFactory } from './llm/provider.js';
-// Load environment variables
-dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const program = new Command();
@@ -34,6 +77,7 @@ program
     .option('-p, --provider <provider>', 'LLM provider')
     .option('-t, --temperature <temp>', 'Temperature', parseFloat)
     .option('--no-stream', 'Disable streaming')
+    .option('-s, --session <sessionId>', 'Resume a specific session ID')
     .action(async (options) => {
     try {
         const platformDetector = PlatformDetector.getInstance();
@@ -67,6 +111,19 @@ program
         if (config.mcp.enabled) {
             await mcpManager.connectAll();
         }
+        // Handle session resume if specified
+        if (options.session) {
+            const loaded = await memory.loadSession(options.session);
+            if (!loaded) {
+                console.error(chalk.yellow(`⚠ Session ${options.session} not found. Starting fresh session.`));
+            }
+            else {
+                console.log(chalk.green(`✓ Resumed session: ${options.session} (${(await memory.getMessages()).length} messages)`));
+            }
+        }
+        else {
+            await memory.load();
+        }
         // Check LLM availability
         const availability = await llmFactory.checkAvailability();
         const availableProviders = availability.filter(a => a.available);
@@ -82,8 +139,12 @@ program
             platform: platformInfo.type,
             tools: toolRegistry.list().length,
             agents: agentOrchestrator.getAgents().length,
+            portable: configLoader.isPortable(),
         });
         console.log(chalk.green(`\n✨ Cod3x Code v4.0 by CodexHaven`));
+        if (configLoader.isPortable()) {
+            console.log(chalk.cyan(`📦 Portable Mode - All data stays in ./data/`));
+        }
         console.log(chalk.gray(`Platform: ${platformInfo.type} | Tools: ${toolRegistry.list().length} | Agents: ${agentOrchestrator.getAgents().length}`));
         console.log(chalk.gray(`Type /help for commands\n`));
         render(_jsx(Cod3xApp, { config: config, logger: logger, permissions: permissions, toolRegistry: toolRegistry, fileIndex: fileIndex, memory: memory, mcpManager: mcpManager, agentOrchestrator: agentOrchestrator, llmFactory: llmFactory, platform: platformInfo }));
@@ -249,6 +310,78 @@ program
     const { MCPManager } = await import('./mcp/manager');
     await new MCPManager().addServer(name, url);
 }));
+// ═══ Resume Session Command ═══
+program
+    .command('resume <sessionId>')
+    .description('Resume a previous chat session')
+    .option('-m, --model <model>', 'LLM model to use')
+    .option('-p, --provider <provider>', 'LLM provider')
+    .option('--no-stream', 'Disable streaming')
+    .action(async (sessionId, options) => {
+    try {
+        const platformDetector = PlatformDetector.getInstance();
+        const platformInfo = await platformDetector.detect();
+        platformDetector.applyEnvironment(platformInfo);
+        const configLoader = new ConfigLoader();
+        const config = await configLoader.load();
+        if (options.model)
+            config.ai.model = options.model;
+        if (options.provider)
+            config.ai.provider = options.provider;
+        if (options.stream === false)
+            config.features.streaming = false;
+        const logger = new Logger(config.logging);
+        const permissions = new PermissionManager(config.permissions);
+        const fileIndex = new FileIndex();
+        const toolRegistry = new ToolRegistry();
+        const memory = new ConversationMemory();
+        const mcpManager = new MCPManager(config.mcp);
+        const llmFactory = new LLMProviderFactory(config, logger);
+        const agentOrchestrator = new AgentOrchestrator(config.agents, llmFactory.getPrimary(), logger, toolRegistry);
+        if (config.features.swarmAgents) {
+            agentOrchestrator.initializeSwarm(config.swarm);
+        }
+        await logger.initialize();
+        await fileIndex.build(process.cwd(), config.context);
+        await toolRegistry.loadDefaults();
+        if (config.mcp.enabled) {
+            await mcpManager.connectAll();
+        }
+        // Load the session
+        const loaded = await memory.loadSession(sessionId);
+        if (!loaded) {
+            console.error(chalk.red(`✗ Session ${sessionId} not found.`));
+            console.log(chalk.gray('Available sessions:'));
+            const sessions = await memory.listSessions();
+            if (sessions.length === 0) {
+                console.log(chalk.gray('  (none)'));
+            }
+            else {
+                sessions.forEach(s => console.log(chalk.gray(`  - ${s}`)));
+            }
+            process.exit(1);
+        }
+        console.log(chalk.green(`✓ Resumed session: ${sessionId} (${(await memory.getMessages()).length} messages)`));
+        logger.info('Cod3x Code v4.0 resumed session', {
+            sessionId,
+            model: config.ai.model,
+            provider: config.ai.provider,
+            platform: platformInfo.type,
+            portable: configLoader.isPortable(),
+        });
+        console.log(chalk.green(`\n✨ Cod3x Code v4.0 by CodexHaven`));
+        if (configLoader.isPortable()) {
+            console.log(chalk.cyan(`📦 Portable Mode - All data stays in ./data/`));
+        }
+        console.log(chalk.gray(`Platform: ${platformInfo.type} | Tools: ${toolRegistry.list().length} | Agents: ${agentOrchestrator.getAgents().length}`));
+        console.log(chalk.gray(`Type /help for commands\n`));
+        render(_jsx(Cod3xApp, { config: config, logger: logger, permissions: permissions, toolRegistry: toolRegistry, fileIndex: fileIndex, memory: memory, mcpManager: mcpManager, agentOrchestrator: agentOrchestrator, llmFactory: llmFactory, platform: platformInfo }));
+    }
+    catch (error) {
+        console.error(chalk.red('Fatal error:'), error);
+        process.exit(1);
+    }
+});
 // ═══ Parse ═══
 program.parse();
 //# sourceMappingURL=main.js.map

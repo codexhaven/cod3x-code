@@ -7,6 +7,9 @@
  * The Open-Source Claude Code Alternative
  * Production-ready AI coding assistant with swarm agents,
  * 80+ tools, multi-platform support, and browser capabilities.
+ *
+ * PORTABLE MODE: If a data/ directory exists alongside the executable,
+ * all configs, logs, caches, and memory are redirected there.
  * ═══════════════════════════════════════════════════════════════
  */
 export {};

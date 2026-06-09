@@ -6,6 +6,8 @@
  * 80+ tools across 14 categories with platform awareness
  * ═══════════════════════════════════════════════════════════════
  */
+import fs from 'fs/promises';
+import path from 'path';
 // ─── Filesystem Tools (13) ───
 import * as readFile from '../tools/filesystem/read.js';
 import * as writeFile from '../tools/filesystem/write.js';
@@ -93,12 +95,47 @@ import * as stackTrace from '../tools/debug/stack-trace.js';
 export class ToolRegistry {
     tools = new Map();
     context;
+    permissionsLogPath;
     constructor() {
+        // Determine log path: portable or standard
+        this.permissionsLogPath = process.env.COD3X_HOME
+            ? path.join(process.env.COD3X_HOME, 'logs', 'permissions.log')
+            : path.join(process.cwd(), 'logs', 'permissions.log');
+        const isLimitless = process.env.COD3X_LIMITLESS === '1';
+        const isPortable = !!process.env.COD3X_PORTABLE_ROOT;
+        // DANGEROUS tools that always require approval in portable mode
+        const dangerousTools = ['bash', 'write_file', 'edit_file', 'remove_file'];
         this.context = {
             cwd: process.cwd(),
             permissions: {
-                ask: async () => ({ granted: true, permanent: false }),
-                check: async () => true,
+                ask: async (request) => {
+                    const toolName = request.details?.tool || '';
+                    // In portable mode, dangerous tools ALWAYS prompt regardless of LIMITLESS
+                    if (isPortable && dangerousTools.includes(toolName)) {
+                        await this.logPermission(toolName, false, 'portable-safety-override');
+                        return { granted: false, permanent: false, reason: `Portable mode safety: ${toolName} requires explicit approval` };
+                    }
+                    // In limitless mode, auto-grant
+                    if (isLimitless) {
+                        await this.logPermission(toolName, true, 'limitless-mode');
+                        return { granted: true, permanent: false };
+                    }
+                    // Default: require approval
+                    await this.logPermission(toolName, false, 'default');
+                    return { granted: false, permanent: false, reason: `Approval required for ${toolName}` };
+                },
+                check: async (action, details) => {
+                    const toolName = details?.tool || action;
+                    // Portable mode: dangerous tools always denied by check
+                    if (isPortable && dangerousTools.includes(toolName)) {
+                        return false;
+                    }
+                    // Limitless mode: always allowed
+                    if (isLimitless) {
+                        return true;
+                    }
+                    return false;
+                },
                 addAutoApprove: () => { },
                 addAutoDeny: () => { },
                 clearCache: () => { },
@@ -131,6 +168,36 @@ export class ToolRegistry {
             },
         };
     }
+    /**
+     * Log permission decisions to data/logs/permissions.log
+     */
+    async logPermission(tool, granted, reason) {
+        try {
+            const logDir = path.dirname(this.permissionsLogPath);
+            await fs.mkdir(logDir, { recursive: true });
+            const entry = `[${new Date().toISOString()}] [PERMISSION] tool=${tool} granted=${granted} reason=${reason}\n`;
+            await fs.appendFile(this.permissionsLogPath, entry);
+        }
+        catch {
+            // Silent fail for logging
+        }
+    }
+    /**
+     * Check if a tool is dangerous and requires explicit approval in portable mode
+     */
+    isDangerousTool(name) {
+        const dangerousTools = ['bash', 'write_file', 'edit_file', 'remove_file'];
+        return dangerousTools.includes(name);
+    }
+    /**
+     * Check if portable mode safety override applies
+     */
+    requiresExplicitApproval(name) {
+        const isPortable = !!process.env.COD3X_PORTABLE_ROOT;
+        if (!isPortable)
+            return false;
+        return this.isDangerousTool(name);
+    }
     register(tool) {
         this.tools.set(tool.name, tool);
     }
@@ -155,6 +222,29 @@ export class ToolRegistry {
                 error: `Unknown tool: ${name}. Available: ${this.list().map((t) => t.name).join(', ')}`,
             };
         }
+        // Check portable mode safety override for dangerous tools
+        if (this.requiresExplicitApproval(name)) {
+            await this.logPermission(name, false, 'portable-safety-check');
+            // Return error requiring explicit user approval
+            return {
+                success: false,
+                output: '',
+                error: `SAFETY: ${name} requires explicit approval in portable mode. Set COD3X_LIMITLESS=1 to bypass (not recommended on untrusted machines).`,
+            };
+        }
+        // Check LIMITLESS mode for other tools that require approval
+        if (tool.requiresApproval && !this.context.permissions.check) {
+            const isLimitless = process.env.COD3X_LIMITLESS === '1';
+            if (!isLimitless) {
+                await this.logPermission(name, false, 'requires-approval');
+                return {
+                    success: false,
+                    output: '',
+                    error: `Tool ${name} requires approval. Run with COD3X_LIMITLESS=1 to auto-approve (use with caution).`,
+                };
+            }
+        }
+        await this.logPermission(name, true, 'executing');
         return tool.handler(params, this.context);
     }
     async loadDefaults() {
